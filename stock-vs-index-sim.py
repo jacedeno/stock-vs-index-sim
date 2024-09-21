@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 # ===================== Streamlit Application =====================
-st.title("Portfolio vs Index Comparison by @GeekendZone")
+st.title("Portfolio Comparison: Individual Stock Portfolio vs Index Fund")
 
 # Inputs for the user
 st.sidebar.header("Input Parameters")
@@ -28,8 +28,8 @@ contribution = st.sidebar.number_input("Monthly or Weekly Contribution (in USD)"
 # Contribution frequency selection
 contrib_freq = st.sidebar.selectbox("Contribution Frequency", ["Weekly", "Monthly", "Annually"])
 
-# Function to download data
-@st.cache
+# Function to download data (use st.cache_data for caching data functions)
+@st.cache_data
 def download_data(tickers, start, end):
     data = yf.download(tickers, start=start, end=end, interval='1mo', auto_adjust=True)
     return data['Close']
@@ -57,9 +57,9 @@ def simulate_portfolio(stock_prices, total_contribution, contrib_freq):
 
             holding_value = shares_bought[ticker][i] * price
             portfolio_value += holding_value
-        
+
         portfolio_value_over_time.append(portfolio_value)
-    
+
     return pd.DataFrame({'Portfolio Value': portfolio_value_over_time}, index=months[1:])
 
 # Simulation logic for index investment like SPY
@@ -70,7 +70,7 @@ def simulate_index_investment(index_prices, total_contribution, contrib_freq):
     shares_bought = np.zeros(len(index_prices))
     leftover_cash = 0
     portfolio_value_over_time = []
-    
+
     # Simulate periodic investments
     for i in range(1, len(months)):
         price = index_prices.iloc[i]
@@ -81,7 +81,7 @@ def simulate_index_investment(index_prices, total_contribution, contrib_freq):
 
         holding_value = shares_bought[i] * price
         portfolio_value_over_time.append(holding_value)
-    
+
     return pd.DataFrame({'Index Value': portfolio_value_over_time}, index=months[1:])
 
 # Helper function to convert contribution frequency
@@ -105,21 +105,24 @@ index_portfolio_df = simulate_index_investment(index_prices, contribution, contr
 # == Visualization ==
 st.subheader(f"Performance of Portfolio vs {index_ticker} Index Fund")
 
-plt.figure(figsize=(10, 6))
-plt.title('Consolidated Portfolio vs Index Fund Over Time')
+# Matplotlib figure creation
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.set_title('Consolidated Portfolio vs Index Fund Over Time')
 
 # Plotting performance of the individual stocks portfolio
-plt.plot(individual_portfolio_df['Portfolio Value'], label=f'Portfolio (Selected Stocks)', color='blue', linewidth=2)
+ax.plot(individual_portfolio_df['Portfolio Value'], label=f'Portfolio (Selected Stocks)', color='blue', linewidth=2)
 
 # Plotting performance of the index fund investment (e.g., SPY)
-plt.plot(index_portfolio_df['Index Value'], label=f'{index_ticker} Index Fund', color='green', linewidth=2)
+ax.plot(index_portfolio_df['Index Value'], label=f'{index_ticker} Index Fund', color='green', linewidth=2)
 
 # Add labels, legend, and grid
-plt.legend()
-plt.xlabel('Time')
-plt.ylabel('Portfolio Value (USD)')
-plt.grid(True)
-st.pyplot(plt)
+ax.legend()
+ax.set_xlabel('Time')
+ax.set_ylabel('Portfolio Value (USD)')
+ax.grid(True)
+
+# Display the plot in Streamlit
+st.pyplot(fig)
 
 # Showing the final portfolio values at the end date
 st.subheader("Final Portfolio Values")
