@@ -28,9 +28,6 @@ contribution = st.sidebar.number_input("Monthly or Weekly Contribution (in USD)"
 # Contribution frequency selection
 contrib_freq = st.sidebar.selectbox("Contribution Frequency", ["Weekly", "Monthly", "Annually"])
 
-# Initialize Streamlit plot
-st.set_option('deprecation.showPyplotGlobalUse', False)
-
 # Function to download data
 @st.cache
 def download_data(tickers, start, end):
