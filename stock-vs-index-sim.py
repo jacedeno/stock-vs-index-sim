@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 # ===================== Streamlit Application =====================
-st.title("Portfolio Comparison: Individual Stock Portfolio vs Index Fund")
+st.title("Portfolio vs Index Comparison by @GeekendZone")
 
 # Inputs for the user
 st.sidebar.header("Input Parameters")
