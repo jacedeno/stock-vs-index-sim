@@ -6,10 +6,13 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 # ===================== Streamlit Application =====================
-st.title("Portfolio vs Index Comparison by @GeekendZone")
+st.set_page_config(page_title="Portfolio vs Index Comparison by GeekendZone", page_icon="favicon.ico")
+
+st.header("Portfolio vs Index Comparison by GeekendZone:sunglasses:", divider="gray")
 
 # Inputs for the user
 st.sidebar.header("Input Parameters")
+
 # Ticker input for a stock
 ticker_list = st.sidebar.text_input("Enter the ticker symbols (separated by comma)", "AAPL, MSFT, GOOGL, AMZN")
 tickers = [x.strip() for x in ticker_list.split(',')]
@@ -26,16 +29,29 @@ initial_amount = st.sidebar.number_input("Initial Investment (in USD)", value=10
 contribution = st.sidebar.number_input("Monthly or Weekly Contribution (in USD)", value=800, step=100)
 
 # Contribution frequency selection
-contrib_freq = st.sidebar.selectbox("Contribution Frequency", ["Weekly", "Monthly", "Annually"])
+contrib_freq = st.sidebar.selectbox("Contribution Frequency", ["Daily", "Weekly", "Monthly", "Annually"])
 
-# Function to download data (use st.cache_data for caching data functions)
+# Customizable interval selection
+interval = st.sidebar.selectbox("Select Data Interval", ["1d", "1wk", "1mo"], index=2)
+
+# Function to handle contribution frequency
+def convert_contribution_frequency(contribution, freq):
+    if freq == "Daily":
+        return contribution * 30  # Approx. 30 days per month
+    elif freq == "Weekly":
+        return contribution * 4.33  # Approx. 4.33 weeks per month
+    elif freq == "Annual":
+        return contribution / 12  # Annual to monthly
+    return contribution  # For monthly
+
+# Function to download data (use the selected interval now)
 @st.cache_data
-def download_data(tickers, start, end):
-    data = yf.download(tickers, start=start, end=end, interval='1mo', auto_adjust=True)
+def download_data(tickers, start, end, interval):
+    data = yf.download(tickers, start=start, end=end, interval=interval, auto_adjust=True)
     return data['Close']
 
-# Simulation logic for portfolio with selected stocks
-def simulate_portfolio(stock_prices, total_contribution, contrib_freq):
+# Simulation logic for portfolio with selected stocks and initial investment
+def simulate_portfolio(stock_prices, total_contribution, contrib_freq, initial_investment):
     months = stock_prices.index
     num_tickers = len(stock_prices.columns)
     monthly_contribution = convert_contribution_frequency(total_contribution, contrib_freq) / num_tickers
@@ -46,6 +62,14 @@ def simulate_portfolio(stock_prices, total_contribution, contrib_freq):
 
     portfolio_value_over_time = []
 
+    # Initial Investment Handling
+    initial_per_stock = initial_investment / num_tickers
+
+    for ticker in stock_prices.columns:
+        initial_shares = initial_per_stock // stock_prices[ticker].iloc[0]
+        leftover_cash[ticker] = initial_per_stock % stock_prices[ticker].iloc[0]
+        shares_bought[ticker][0] = initial_shares
+
     for i in range(1, len(months)):
         portfolio_value = 0
         for ticker in stock_prices.columns:
@@ -55,6 +79,7 @@ def simulate_portfolio(stock_prices, total_contribution, contrib_freq):
             leftover_cash[ticker] = total_money % price
             shares_bought[ticker][i] = shares_bought[ticker][i-1] + shares_to_buy
 
+            # Holding value of all shares for this stock
             holding_value = shares_bought[ticker][i] * price
             portfolio_value += holding_value
 
@@ -62,14 +87,19 @@ def simulate_portfolio(stock_prices, total_contribution, contrib_freq):
 
     return pd.DataFrame({'Portfolio Value': portfolio_value_over_time}, index=months[1:])
 
-# Simulation logic for index investment like SPY
-def simulate_index_investment(index_prices, total_contribution, contrib_freq):
+# Simulation logic for index investment like SPY with initial investment
+def simulate_index_investment(index_prices, total_contribution, contrib_freq, initial_investment):
     months = index_prices.index
     monthly_contribution = convert_contribution_frequency(total_contribution, contrib_freq)
 
     shares_bought = np.zeros(len(index_prices))
     leftover_cash = 0
     portfolio_value_over_time = []
+
+    # Initial Investment Handling
+    initial_shares = initial_investment // index_prices.iloc[0]
+    leftover_cash = initial_investment % index_prices.iloc[0]
+    shares_bought[0] = initial_shares
 
     # Simulate periodic investments
     for i in range(1, len(months)):
@@ -84,23 +114,21 @@ def simulate_index_investment(index_prices, total_contribution, contrib_freq):
 
     return pd.DataFrame({'Index Value': portfolio_value_over_time}, index=months[1:])
 
-# Helper function to convert contribution frequency
-def convert_contribution_frequency(contribution, freq):
-    if freq == "Weekly":
-        return contribution * 4.33  # Approx. 4.33 weeks per month
-    elif freq == "Annual":
-        return contribution / 12  # Convert annual to monthly
-    return contribution  # For monthly
-
 # ============================ MAIN LOGIC ==========================
 
-# Download data for selected stocks and the index
-stock_prices = download_data(tickers, start_date, end_date)
-index_prices = download_data(index_ticker, start_date, end_date)
+with st.spinner('Fetching data and performing computation...'):
+    # Download data for selected stocks and index
+    stock_prices = download_data(tickers, start_date, end_date, interval)
+    index_prices = download_data(index_ticker, start_date, end_date, interval)
+
+    # Error Handling
+    if stock_prices.empty or index_prices.empty:
+        st.error("Error fetching data. Please check your input tickers and try again.")
+        st.stop()
 
 # Simulating the investments
-individual_portfolio_df = simulate_portfolio(stock_prices, contribution, contrib_freq)
-index_portfolio_df = simulate_index_investment(index_prices, contribution, contrib_freq)
+individual_portfolio_df = simulate_portfolio(stock_prices, contribution, contrib_freq, initial_amount)
+index_portfolio_df = simulate_index_investment(index_prices, contribution, contrib_freq, initial_amount)
 
 # == Visualization ==
 st.subheader(f"Performance of Portfolio vs {index_ticker} Index Fund")
@@ -131,4 +159,12 @@ final_index_value = index_portfolio_df['Index Value'].iloc[-1]
 st.write(f"Final Value of Selected Stocks Portfolio: ${final_stock_value:,.2f}")
 st.write(f"Final Value of {index_ticker} Index Fund: ${final_index_value:,.2f}")
 
-st.write("Thank you for using the investment simulator!")
+# Download option for the portfolio results as a CSV
+st.download_button(
+    label="Download Portfolio Data (CSV)",
+    data=individual_portfolio_df.to_csv(),
+    file_name='portfolio_data.csv',
+    mime='text/csv',
+)
+
+st.write("Thanks for using my simulator, Jose Cedeno!")
